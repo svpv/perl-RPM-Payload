@@ -8,86 +8,23 @@ our $DEBUG;
 
 sub new {
 	my ($class, $f) = @_;
-	open my $fh, "<", $f or die "$f: $!";
-	{
-		read($fh, my $lead, 96) == 96 or die "$f: bad rpm lead";
-		my ($magic, $major, $minor) = unpack "NCC", $lead;
-		$magic == 0xedabeedb or die "$f: bad rpm magic";
-		$major == 3 or $major == 4 or warn "$f: rpm version $major.$minor";
-	}
-	{
-		read($fh, my $signature, 16) == 16 or die "$f: bad rpm signature";
-		my ($magic, undef, $sections, $bytes) = unpack "N4", $signature;
-		$magic == 0x8eade801 or die "$f: bad rpm signature";
-		my $sigsize = 16 * $sections + $bytes;
-		$sigsize += (8 - $sigsize % 8) % 8;
-		seek $fh, $sigsize, 1 or die "$f: bad rpm signature";
-	}
-	warn "$f: header pos " . tell($fh) if $DEBUG;
-	{
-		read($fh, my $header, 16) == 16 or die "$f: bad rpm header";
-		my ($magic, undef, $sections, $bytes) = unpack "N4", $header;
-		$magic == 0x8eade801 or die "$f: bad rpm header";
-		my $hdrsize = 16 * $sections + $bytes;
-		seek $fh, $hdrsize, 1 or die "$f: bad rpm header";
-	}
-	warn "$f: payload pos " . tell($fh) if $DEBUG;
-	{
-		read($fh, my $buf, 8) == 8 or die "$f: bad rpm payload";
-		seek $fh, -8, 1 or die "$f: bad rpm payload";
-		if (substr($buf, 0, 2) eq "\037\213") {
-			require Compress::Zlib;
-			# Here is a subtle gotcha: I can't simply do
-			#	$gzstream = Compress::Zlib::gzopen($fh, "rb");
-			#	return $gzstream;
-			# because $fh will be GC-autoclosed and zlib will bail out
-			# with EBADF, but only after its internal buffer is exhausted.
-			# So I have to keep plain $fh along with $gzstream somehow.
-			my $gzstream = Compress::Zlib::gzopen($fh, "rb")
-				or die "$f: bad gzdio payload";
-			*$fh = \$gzstream;
-		}
-		elsif (substr($buf, 0, 3) eq "BZh") {
-			require Compress::Bzip2;
-			Compress::Bzip2->VERSION(2);
-			my $gzstream = Compress::Bzip2::gzopen($fh, "rb")
-				or die "$f: bad bzdio payload";
-			*$fh = \$gzstream;
-		}
-		elsif (substr($buf, 0, 6) eq "070701") {
-			# cpio OK
-		}
-		else {
-			die "$f: bad rpm payload";
-		}
-	}
-	warn "$f: $fh" if $DEBUG;
+	open my $fh, "-|", "rpm2cpio", $f
+		or die "$f: rpm2cpio failed";
 	bless [ $f, $fh, 0, 0, 0 ] => $class;
 }
 
 sub _read ($$$) {
-	if (my $gzstream = *{$_[0]}{SCALAR}) {
-		$gzstream = $$gzstream;
-		$gzstream->gzread($_[1], $_[2]);
-	}
-	else {
-		read $_[0], $_[1], $_[2];
-	}
+	read $_[0], $_[1], $_[2];
 }
 
 sub _skip ($$) {
-	if (my $gzstream = *{$_[0]}{SCALAR}) {
-		$gzstream = $$gzstream;
-		my $n = $_[1];
-		while ($n > 0) {
-			use List::Util qw(min);
-			my $m = min($n, 8192);
-			$gzstream->gzread(my $buf, $m) == $m or die;
-			$n -= $m;
-		}
-	}
-	else {
-		seek $_[0], $_[1], 1;
+	my ($fh, $n) = @_;
+	while ($n > 0) {
+		use List::Util qw(min);
+		my $m = min($n, 8192);
+		read($fh, my $buf, $m) == $m
+			or die "cannot skip cpio bytes";
+		$n -= $m;
 	}
 }
 
