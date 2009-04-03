@@ -4,7 +4,7 @@ Version: 0.02
 Release: alt1
 
 Summary: Simple in-memory access to RPM archive
-License: GPL or Artistic
+License: GPL
 Group: Development/Perl
 
 URL: %CPAN %dist

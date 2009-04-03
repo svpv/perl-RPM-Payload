@@ -192,6 +192,18 @@ C<< $cpio->next >> call.
 Hradlinks must be handled manually.  Alternatively, you may want to skip
 entries with C<< $entry->size == 0 >> altogether.
 
+=head1	AUTHOR
+
+Written by Alexey Tourbin <at@altlinux.org>.
+
+=head1	COPYING
+
+Copyright (c) 2006, 2009  Alexey Tourbin, ALT Linux Team.
+
+This is free software; you can redistribute it and/or modify it under the terms
+of the GNU General Public License as published by the Free Software Foundation;
+either version 2 of the License, or (at your option) any later version.
+
 =head1	SEE ALSO
 
 rpm2cpio(8).
