@@ -3,7 +3,7 @@ Name: perl-%dist
 Version: 0.02
 Release: alt1
 
-Summary: Simple in-memory access to RPM archive
+Summary: Simple in-memory access to RPM cpio archive
 License: GPL
 Group: Development/Perl
 
@@ -16,7 +16,9 @@ BuildArch: noarch
 BuildRequires: perl-devel
 
 %description
-no description
+RPM::Payload provides in-memory access to RPM cpio archive.
+Cpio headers and file data can be read in a simple loop.
+RPM::Payload uses rpm2cpio program which comes with RPM.
 
 %prep
 %setup -q -n %dist-%version

@@ -140,6 +140,12 @@ RPM::Payload - simple in-memory access to RPM cpio archive
 	print $entry->filename, "\n";
     }
 
+=head1	DESCRIPTION
+
+C<RPM::Payload> provides in-memory access to RPM cpio archive.
+Cpio headers and file data can be read in a simple loop.
+C<RPM::Payload> uses C<rpm2cpio> program which comes with RPM.
+
 =head1	EXAMPLE
 
 Piece of Bourne shell code:
