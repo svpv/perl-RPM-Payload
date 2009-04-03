@@ -191,9 +191,9 @@ C<rpm2cpio> program (which comes with RPM) must be installed.
 It will die on error, so you may need an enclosing eval block.  However,
 they say "when you must fail, fail noisily and as soon as possible".
 
-Entries obtained C<< $cpio->next >> are short-lived objects coupled
-with current C<$cpio> state.  They are only valid before the next
-C<< $cpio->next >> call.
+Entries obtained with C<< $cpio->next >> are coupled with current position
+in C<$cpio> stream.  Thus, C<< $entry->read >> and C<< $entry->readlink >>
+methods may only be invoked before the next C<< $cpio->next >> call.
 
 Hradlinks must be handled manually.  Alternatively, you may want to skip
 entries with C<< $entry->size == 0 >> altogether.
