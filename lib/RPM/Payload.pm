@@ -75,7 +75,7 @@ sub next {
 }
 
 package RPM::Payload::entry;
-use Fcntl qw(:mode);
+use Fcntl qw(S_ISREG S_ISLNK);
 
 sub read {
 	die "Usage: ENTRY->read(SCALAR,LENGTH)"
@@ -102,7 +102,18 @@ sub readlink {
 	return $$self{_readlink} if exists $$self{_readlink};
 	my $cpio = $$self{_cpio};
 	my ($f, $fh, $n1, $n2, $n3) = @$cpio;
-	# TODO
+	die "$f: $$self{filename}: not symbolic link"
+		unless S_ISLNK($$self{mode});
+
+	my $n = $n2 - $n1;
+	die "$f: $$self{filename}: bad cpio symlink"
+		if $n < 1;
+
+	$n == read $fh, my $linkto, $n
+		or die "$f: $$self{filename}: cannot read cpio symlink";
+	$$cpio[2] += $n;
+	$$self{_readlink} = $linkto;
+	return $linkto;
 }
 
 for my $method (qw(
