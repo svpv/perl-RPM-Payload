@@ -4,26 +4,23 @@ use 5.008;
 use strict;
 
 our $VERSION = '0.01';
-our $DEBUG;
 
 sub new {
 	my ($class, $f) = @_;
 	open my $fh, "-|", "rpm2cpio", $f
 		or die "$f: rpm2cpio failed";
+	# n1: current data pos
+	# n2: end data pos
+	# n3: next entry pos
 	bless [ $f, $fh, 0, 0, 0 ] => $class;
 }
 
-sub _read ($$$) {
-	read $_[0], $_[1], $_[2];
-}
-
-sub _skip ($$) {
-	my ($fh, $n) = @_;
+sub _skip ($$$) {
+	my ($f, $fh, $n) = @_;
 	while ($n > 0) {
-		use List::Util qw(min);
-		my $m = min($n, 8192);
-		read($fh, my $buf, $m) == $m
-			or die "cannot skip cpio bytes";
+		my $m = ($n > 8192) ? 8192 : $n;
+		$m == read $fh, my $buf, $m
+			or die "$f: cannot skip cpio bytes";
 		$n -= $m;
 	}
 }
@@ -32,28 +29,33 @@ sub next {
 	my $self = shift;
 	my ($f, $fh, $n1, $n2, $n3) = @$self;
 	if ($n3 > $n1) {
-		_skip($fh, $n3 - $n1);
+		_skip($f, $fh, $n3 - $n1);
 		$n1 = $n3;
 	}
-	_read($fh, my $cpio_header, 110) == 110
-		or die "$f: bad cpio header";
+	110 == read $fh, my $cpio_header, 110
+		or die "$f: cannot read cpio header";
 	$n1 += 110;
+
 	my ($magic, $ino, $mode, $uid, $gid, $nlink, $mtime, $size,
 	$dev_major, $dev_minor, $rdev_major, $rdev_minor, $namelen, $checksum) =
 		map hex, unpack "a6(a8)13", $cpio_header;
 	$magic == 0x070701 or die "$f: bad cpio header magic";
+
 	my $namesize = (($namelen + 1) & ~3) + 2;
-	_read($fh, my $filename, $namesize) == $namesize
-		or die "$f: bad cpio filename";
+	$namesize == read $fh, my $filename, $namesize
+		or die "$f: cannot read cpio filename";
 	$n1 += $namesize;
 	substr $filename, $namelen, $namesize, "";
 	chop($filename) eq "\0"
 		or die "$f: bad cpio filename";
+
 	$n2 = $n1 + $size;
 	$n3 = ($n2 + 3) & ~3;
-	warn "filename=$filename datapos=$n1 next=$n3" if $DEBUG;
+	#warn "filename=$filename\tdatapos=$n1 end=$n2 next=$n3\n";
 	@$self[2,3,4] = ($n1, $n2, $n3);
+
 	return if $filename eq "TRAILER!!!";
+
 	my $entry = {
 		filename => $filename,
 		ino	=> $ino,
@@ -76,18 +78,23 @@ package RPM::Payload::entry;
 use Fcntl qw(:mode);
 
 sub read {
-	@_ == 3 or die "Usage: ENTRY->read(SCALAR,LENGTH)";
+	die "Usage: ENTRY->read(SCALAR,LENGTH)"
+		unless @_ == 3;
 	my $self = shift;
 	my $n = pop;
 	my $cpio = $$self{_cpio};
 	my ($f, $fh, $n1, $n2, $n3) = @$cpio;
-	S_ISREG($$self{mode}) or die "$f: $$self{filename}: not regular file";
-	use List::Util qw(min);
-	$n = min($n, $n2 - $n1) or return 0;
-	my $m = RPM::Payload::_read($fh, $_[0], $n)
-		or die "$f: $$self{filename} read failed";
-	$$cpio[2] += $m;
-	return $m;
+	die "$f: $$self{filename}: not regular file"
+		unless S_ISREG($$self{mode});
+
+	my $left = $n2 - $n1;
+	$n = $left if $n > $left;
+	return 0 if $n < 1;
+
+	$n == read $fh, $_[0], $n
+		or die "$f: $$self{filename}: cannot read cpio data";
+	$$cpio[2] += $n;
+	return $n;
 }
 
 sub readlink {
@@ -103,7 +110,7 @@ for my $method (qw(
 	dev_major dev_minor rdev_major rdev_minor))
 {
 	no strict 'refs';
-	*$method = sub { my $self = shift; $$self{$method}; };
+	*$method = sub { $_[0]->{$method} };
 }
 
 1;
