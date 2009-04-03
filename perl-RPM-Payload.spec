@@ -10,6 +10,8 @@ Group: Development/Perl
 URL: %CPAN %dist
 Source: %dist-%version.tar
 
+Requires: /usr/bin/rpm2cpio
+
 BuildArch: noarch
 
 # Automatically added by buildreq on Mon Feb 16 2009
