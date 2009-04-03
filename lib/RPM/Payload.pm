@@ -130,31 +130,31 @@ __END__
 
 =head1	NAME
 
-RPM::Payload - simple in-memory access to RPM archive
+RPM::Payload - simple in-memory access to RPM cpio archive
 
 =head1	SYNOPSIS
 
-  use RPM::Payload;
-  my $cpio = RPM::Payload->new("rpm-3.0.4-0.48.i386.rpm");
-  while (my $entry = $cpio->next) {
-    print $entry->filename, "\n";
-  }
-
-=head1	DESCRIPTION
+    use RPM::Payload;
+    my $cpio = RPM::Payload->new("rpm-3.0.4-0.48.i386.rpm");
+    while (my $entry = $cpio->next) {
+	print $entry->filename, "\n";
+    }
 
 =head1	EXAMPLE
+
+Piece of Bourne shell code:
 
     rpmfile()
     {
 	tmpdir=`mktemp -dt rpmfile.XXXXXXXX`
-	rpm2cpio "$1" |(cd $tmpdir
+	rpm2cpio "$1" |(cd "$tmpdir"
 	    cpio -idmu --quiet --no-absolute-filenames
 	    chmod -Rf u+rwX .
 	    find -type f -print0 |xargs -r0 file)
-	rm -rf $tmpdir
+	rm -rf "$tmpdir"
     }
 
-Here is sample output:
+Sample output:
 
     $ rpmfile rss2mail2-2.25-alt1.noarch.rpm 
     ./usr/share/man/man1/rss2mail2.1.gz: gzip compressed data, from Unix, max compression
@@ -162,8 +162,10 @@ Here is sample output:
     ./etc/rss2mail2rc:                   ASCII text
     $
 
+Perl implementation:
+
     use RPM::Payload;
-    use Fcntl qw(:mode);
+    use Fcntl qw(S_ISREG);
     use File::LibMagic qw(MagicBuffer);
     sub rpmfile {
 	my $f = shift;
@@ -171,21 +173,24 @@ Here is sample output:
 	while (my $entry = $cpio->next) {
 	    next unless S_ISREG($entry->mode);
 	    next unless $entry->size > 0;
-	    $entry->read(my $buf, 4096) > 0 or die "read error";
+	    $entry->read(my $buf, 8192) > 0 or die "read error";
 	    print $entry->filename, "\t", MagicBuffer($buf), "\n";
 	}
     }
 
-=head1	BUGS
+=head1	CAVEATS
 
-It dies on errors.  So you may need encolsing eval block.  However, they say
-"when you must fail, fail noisily and as soon as possible".
+C<rpm2cpio> program (which comes with RPM) must be installed.
 
-Compressed cpio stream is not seekable.  As a consequence, C<$entry->READ>
-method is only valid within the current cpio state, until the next entry
-is obtained with C<$cpio->next>.
+It will die on error, so you may need an enclosing eval block.  However,
+they say "when you must fail, fail noisily and as soon as possible".
 
-Hradlinks.
+Entries obtained C<< $cpio->next >> are short-lived objects coupled
+with current C<$cpio> state.  They are only valid before the next
+C<< $cpio->next >> call.
+
+Hradlinks must be handled manually.  Alternatively, you may want to skip
+entries with C<< $entry->size == 0 >> altogether.
 
 =head1	SEE ALSO
 
