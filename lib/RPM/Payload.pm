@@ -3,7 +3,7 @@ package RPM::Payload;
 use 5.008;
 use strict;
 
-our $VERSION = '0.10';
+our $VERSION = '0.11';
 
 sub new {
 	my ($class, $f) = @_;
