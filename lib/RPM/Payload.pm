@@ -77,7 +77,7 @@ sub next {
 package RPM::Payload::entry;
 use Fcntl qw(S_ISREG S_ISLNK);
 
-sub read {
+sub read : method {
 	die "Usage: ENTRY->read(SCALAR,LENGTH)"
 		unless @_ == 3;
 	my $self = shift;
